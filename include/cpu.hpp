@@ -7,7 +7,15 @@ public:
   uint32_t programCounter;
   uint32_t Instruction;
   CPU();
-  // Operations
+  // Operations-R
   void ADD();
   void SUB();
+  void XOR();
+  void OR();
+  void AND();
+  void SLTU();
+  void SLT();
+  void SLL();
+  void SRL();
+  void SRA();
 };
