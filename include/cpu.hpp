@@ -18,4 +18,14 @@ public:
   void SLL();
   void SRL();
   void SRA();
+  // Operations-I
+  void ADDI();
+  void SLTI();
+  void SLTIU();
+  void XORI();
+  void ORI();
+  void ANDI();
+  void SLLI();
+  void SRLI();
+  void SRAI();
 };
