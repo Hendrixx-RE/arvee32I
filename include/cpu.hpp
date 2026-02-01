@@ -1,12 +1,13 @@
+#pragma once
 #include <cstdint>
 #include <vector>
 
+class Memory;
+
 class CPU {
 public:
-  std::vector<uint32_t> Registers;
-  uint32_t programCounter;
-  uint32_t Instruction;
-  CPU();
+  bool stopped;
+  CPU(Memory *mem);
   // Operations-R
   void ADD();
   void SUB();
@@ -28,4 +29,35 @@ public:
   void SLLI();
   void SRLI();
   void SRAI();
+  void JALR();
+  void LW();
+  void LH();
+  void LHU();
+  void LB();
+  void LBU();
+  void FENCE();
+  void ECALL();
+  void EBREAK();
+  // Operations-S
+  void SW();
+  void SH();
+  void SB();
+  // Operations-B
+  void BEQ();
+  void BNE();
+  void BLT();
+  void BGE();
+  void BLTU();
+  void BGEU();
+  // Operations-U
+  void LUI();
+  void AUIPC();
+  // Operations-J
+  void JAL();
+
+private:
+  std::vector<uint32_t> Registers;
+  uint32_t programCounter;
+  uint32_t Instruction;
+  Memory *mem;
 };
