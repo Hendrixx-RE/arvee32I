@@ -54,6 +54,10 @@ public:
   void AUIPC();
   // Operations-J
   void JAL();
+  // helperfuncs
+  uint8_t decodereg(uint32_t Instruction, int n);
+  int32_t bhelper(uint32_t Instruction);
+  int32_t shelper(uint32_t Instruction);
 
 private:
   std::vector<uint32_t> Registers;
