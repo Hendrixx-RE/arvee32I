@@ -162,30 +162,29 @@ void CPU::ANDI() {
 }
 
 void CPU::SLLI() {
-  uint32_t val = (static_cast<int32_t>(Instruction) >> 20) & 0x1F;
+  uint8_t val = (Instruction >> 20) & 0x1F;
   uint8_t rd = (Instruction >> 7) & 0x1F;
   uint8_t rs1 = (Instruction >> 15) & 0x1F;
   if (rd) {
-    Registers[rd] = Registers[rs1] << val;
+    Registers[rd] = static_cast<int32_t>(Registers[rs1]) << val;
   }
 }
 
 void CPU::SRLI() {
-  uint32_t val = (static_cast<int32_t>(Instruction) >> 20) & 0x1F;
+  uint8_t val = ((Instruction) >> 20) & 0x1F;
   uint8_t rd = (Instruction >> 7) & 0x1F;
   uint8_t rs1 = (Instruction >> 15) & 0x1F;
   if (rd) {
-    Registers[rd] = Registers[rs1] >> val;
+    Registers[rd] = static_cast<int32_t>(Registers[rs1]) >> val;
   }
 }
 
 void CPU::SRAI() {
-  uint32_t val = (static_cast<int32_t>(Instruction) >> 20) & 0x1F;
+  uint8_t val = ((Instruction) >> 20) & 0x1F;
   uint8_t rd = (Instruction >> 7) & 0x1F;
   uint8_t rs1 = (Instruction >> 15) & 0x1F;
-  int32_t rsv = Registers[rs1];
   if (rd) {
-    Registers[rd] = rsv >> val;
+    Registers[rd] = static_cast<int32_t>(Registers[rs1]) >> val;
   }
 }
 
@@ -204,14 +203,13 @@ void CPU::LW() {
   int32_t val = (static_cast<int32_t>(Instruction) >> 20);
   uint8_t rd = (Instruction >> 7) & 0x1F;
   uint8_t rs1 = (Instruction >> 15) & 0x1F;
-  val = static_cast<uint32_t>(val);
-  val += Registers[rs1];
-  if (val % 4 != 0) {
+  uint32_t address = val + Registers[rs1];
+  if (address % 4 != 0) {
     throw std::runtime_error("LW crashed coz of memory alingment at " +
-                             std::to_string(val));
+                             std::to_string(address));
   }
   if (rd) {
-    Registers[rd] = mem->read32(val);
+    Registers[rd] = mem->read32(address);
   }
 }
 
@@ -219,14 +217,13 @@ void CPU::LH() {
   int32_t val = (static_cast<int32_t>(Instruction) >> 20);
   uint8_t rd = (Instruction >> 7) & 0x1F;
   uint8_t rs1 = (Instruction >> 15) & 0x1F;
-  val = static_cast<uint32_t>(val);
-  val += Registers[rs1];
-  if (val % 2 != 0) {
+  uint32_t address = val + Registers[rs1];
+  if (address % 2 != 0) {
     throw std::runtime_error("LH crashed coz of memory alingment at " +
-                             std::to_string(val));
+                             std::to_string(address));
   }
   if (rd) {
-    int16_t temp = mem->read16(val);
+    int16_t temp = mem->read16(address);
     Registers[rd] = static_cast<int32_t>(temp);
   }
 }
@@ -235,14 +232,13 @@ void CPU::LHU() {
   int32_t val = (static_cast<int32_t>(Instruction) >> 20);
   uint8_t rd = (Instruction >> 7) & 0x1F;
   uint8_t rs1 = (Instruction >> 15) & 0x1F;
-  val = static_cast<uint32_t>(val);
-  val += Registers[rs1];
-  if (val % 2 != 0) {
+  uint32_t address = val + Registers[rs1];
+  if (address % 2 != 0) {
     throw std::runtime_error("LHU crashed coz of memory alingment at " +
-                             std::to_string(val));
+                             std::to_string(address));
   }
   if (rd) {
-    Registers[rd] = mem->read16(val);
+    Registers[rd] = mem->read16(address);
   }
 }
 
@@ -250,10 +246,9 @@ void CPU::LB() {
   int32_t val = (static_cast<int32_t>(Instruction) >> 20);
   uint8_t rd = (Instruction >> 7) & 0x1F;
   uint8_t rs1 = (Instruction >> 15) & 0x1F;
-  val = static_cast<uint32_t>(val);
-  val += Registers[rs1];
+  uint32_t address = val + Registers[rs1];
   if (rd) {
-    int8_t temp = mem->read8(val);
+    int8_t temp = mem->read8(address);
     Registers[rd] = static_cast<int32_t>(temp);
   }
 }
@@ -262,10 +257,9 @@ void CPU::LBU() {
   int32_t val = (static_cast<int32_t>(Instruction) >> 20);
   uint8_t rd = (Instruction >> 7) & 0x1F;
   uint8_t rs1 = (Instruction >> 15) & 0x1F;
-  val = static_cast<uint32_t>(val);
-  val += Registers[rs1];
+  uint32_t address = val + Registers[rs1];
   if (rd) {
-    Registers[rd] = mem->read8(val);
+    Registers[rd] = mem->read8(address);
   }
 }
 
@@ -310,5 +304,119 @@ void CPU::SW() {
   uint8_t rs1 = (Instruction >> 15) & 0x1F;
   uint8_t rs2 = (Instruction >> 20) & 0x1F;
   int32_t val = ((Instruction >> 7) & 0x1F) | ((Instruction >> 20) & 0xFE0);
-  val = static_cast<int32_t>(val);
+  val = (val << 20) >> 20;
+  uint32_t address = val + Registers[rs1];
+  if (address % 4 != 0) {
+    throw std::runtime_error("SW faulted address invalid");
+  }
+  mem->write32(address, Registers[rs2]);
+}
+
+void CPU::SH() {
+  uint8_t rs1 = (Instruction >> 15) & 0x1F;
+  uint8_t rs2 = (Instruction >> 20) & 0x1F;
+  int32_t val = ((Instruction >> 7) & 0x1F) | ((Instruction >> 20) & 0xFE0);
+  val = (val << 20) >> 20;
+  uint32_t address = val + Registers[rs1];
+  if (address % 2 != 0) {
+    throw std::runtime_error("SH faulted address invalid");
+  }
+  uint16_t value = Registers[rs2] & 0xFFFF;
+  mem->write16(address, value);
+}
+
+void CPU::SB() {
+  uint8_t rs1 = (Instruction >> 15) & 0x1F;
+  uint8_t rs2 = (Instruction >> 20) & 0x1F;
+  int32_t val = ((Instruction >> 7) & 0x1F) | ((Instruction >> 20) & 0xFE0);
+  val = (val << 20) >> 20;
+  uint32_t address = val + Registers[rs1];
+  uint8_t value = Registers[rs2] & 0xFF;
+  mem->write8(address, value);
+}
+
+void CPU::BEQ() {
+  uint8_t rs1 = (Instruction >> 15) & 0x1F;
+  uint8_t rs2 = (Instruction >> 20) & 0x1F;
+  uint8_t i12 = (Instruction >> 31) & 1;
+  uint8_t i11 = (Instruction >> 7) & 1;
+  uint8_t i10_5 = (Instruction >> 25) & 0x3F;
+  uint8_t i4_1 = (Instruction >> 8) & 0xF;
+  uint16_t val = i12 << 12 | i11 << 11 | i10_5 << 5 | i4_1 << 1;
+  int32_t imm = (static_cast<int32_t>(val << 19)) >> 19;
+  if (Registers[rs1] == Registers[rs2]) {
+    programCounter += imm;
+  }
+}
+
+void CPU::BNE() {
+  uint8_t rs1 = (Instruction >> 15) & 0x1F;
+  uint8_t rs2 = (Instruction >> 20) & 0x1F;
+  uint8_t i12 = (Instruction >> 31) & 1;
+  uint8_t i11 = (Instruction >> 7) & 1;
+  uint8_t i10_5 = (Instruction >> 25) & 0x3F;
+  uint8_t i4_1 = (Instruction >> 8) & 0xF;
+  uint16_t val = i12 << 12 | i11 << 11 | i10_5 << 5 | i4_1 << 1;
+  int32_t imm = (static_cast<int32_t>(val << 19)) >> 19;
+  if (Registers[rs1] != Registers[rs2]) {
+    programCounter += imm;
+  }
+}
+
+void CPU::BLT() {
+  uint8_t rs1 = (Instruction >> 15) & 0x1F;
+  uint8_t rs2 = (Instruction >> 20) & 0x1F;
+  uint8_t i12 = (Instruction >> 31) & 1;
+  uint8_t i11 = (Instruction >> 7) & 1;
+  uint8_t i10_5 = (Instruction >> 25) & 0x3F;
+  uint8_t i4_1 = (Instruction >> 8) & 0xF;
+  uint16_t val = i12 << 12 | i11 << 11 | i10_5 << 5 | i4_1 << 1;
+  int32_t imm = (static_cast<int32_t>(val << 19)) >> 19;
+  if (static_cast<int32_t>(Registers[rs1]) <
+      static_cast<int32_t>(Registers[rs2])) {
+    programCounter += imm;
+  }
+}
+
+void CPU::BGE() {
+  uint8_t rs1 = (Instruction >> 15) & 0x1F;
+  uint8_t rs2 = (Instruction >> 20) & 0x1F;
+  uint8_t i12 = (Instruction >> 31) & 1;
+  uint8_t i11 = (Instruction >> 7) & 1;
+  uint8_t i10_5 = (Instruction >> 25) & 0x3F;
+  uint8_t i4_1 = (Instruction >> 8) & 0xF;
+  uint16_t val = i12 << 12 | i11 << 11 | i10_5 << 5 | i4_1 << 1;
+  int32_t imm = (static_cast<int32_t>(val << 19)) >> 19;
+  if (static_cast<int32_t>(Registers[rs1]) >=
+      static_cast<int32_t>(Registers[rs2])) {
+    programCounter += imm;
+  }
+}
+
+void CPU::BLTU() {
+  uint8_t rs1 = (Instruction >> 15) & 0x1F;
+  uint8_t rs2 = (Instruction >> 20) & 0x1F;
+  uint8_t i12 = (Instruction >> 31) & 1;
+  uint8_t i11 = (Instruction >> 7) & 1;
+  uint8_t i10_5 = (Instruction >> 25) & 0x3F;
+  uint8_t i4_1 = (Instruction >> 8) & 0xF;
+  uint16_t val = i12 << 12 | i11 << 11 | i10_5 << 5 | i4_1 << 1;
+  int32_t imm = (static_cast<int32_t>(val << 19)) >> 19;
+  if (Registers[rs1] < Registers[rs2]) {
+    programCounter += imm;
+  }
+}
+
+void CPU::BGEU() {
+  uint8_t rs1 = (Instruction >> 15) & 0x1F;
+  uint8_t rs2 = (Instruction >> 20) & 0x1F;
+  uint8_t i12 = (Instruction >> 31) & 1;
+  uint8_t i11 = (Instruction >> 7) & 1;
+  uint8_t i10_5 = (Instruction >> 25) & 0x3F;
+  uint8_t i4_1 = (Instruction >> 8) & 0xF;
+  uint16_t val = i12 << 12 | i11 << 11 | i10_5 << 5 | i4_1 << 1;
+  int32_t imm = (static_cast<int32_t>(val << 19)) >> 19;
+  if (Registers[rs1] >= Registers[rs2]) {
+    programCounter += imm;
+  }
 }
