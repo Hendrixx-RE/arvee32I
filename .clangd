@@ -1,0 +1,8 @@
+CompileFlags:
+  Add: [
+    "-std=c++20",
+    "-fconstexpr-depth=2147483647",
+    "-fconstexpr-steps=2147483647",
+    "-Wall",
+    "-Wextra"
+  ]

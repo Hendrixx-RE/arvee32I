@@ -4,8 +4,10 @@
 #include <stdexcept>
 
 CPU::CPU(Memory *mem)
-    : mem(mem), Registers(32), programCounter(0), Instruction(0),
-      stopped(false) {}
+    : stopped(false), Registers(32), Instruction(0), programCounter(0),
+      mem(mem) {
+  Registers[2] = 64 * 1024 * 1024 - 1;
+}
 
 uint8_t CPU::decodereg(uint32_t Instruction, int n) {
   switch (n) {
@@ -19,12 +21,14 @@ uint8_t CPU::decodereg(uint32_t Instruction, int n) {
 }
 
 int32_t CPU::bhelper(uint32_t Instruction) {
-  uint8_t i12 = (Instruction >> 31) & 1;
-  uint8_t i11 = (Instruction >> 7) & 1;
-  uint8_t i10_5 = (Instruction >> 25) & 0x3F;
-  uint8_t i4_1 = (Instruction >> 8) & 0xF;
-  uint16_t val = i12 << 12 | i11 << 11 | i10_5 << 5 | i4_1 << 1;
-  return (static_cast<int32_t>(val << 19)) >> 19;
+  uint32_t i12 = (Instruction >> 31) & 0x1;
+  uint32_t i11 = (Instruction >> 7) & 0x1;
+  uint32_t i10_5 = (Instruction >> 25) & 0x3F;
+  uint32_t i4_1 = (Instruction >> 8) & 0xF;
+  int32_t imm = (i12 << 12) | (i11 << 11) | (i10_5 << 5) | (i4_1 << 1);
+  if (imm & 0x1000)
+    imm |= 0xFFFFE000;
+  return imm;
 }
 
 int32_t CPU::shelper(uint32_t Instruction) {
@@ -257,31 +261,35 @@ void CPU::LBU() {
 
 void CPU::FENCE() {}
 
-void CPU::EBREAK() {
-  std::cerr << "EBREAK initiated" << std::endl;
-  stopped = true;
-}
-
-void CPU::ECALL() {
+void CPU::SYSTEM() {
+  uint32_t imm = (Instruction >> 20);
+  if (imm) {
+    std::cerr << "EBREAK initiated" << std::endl;
+    stopped = true;
+    return;
+  }
   uint32_t id = Registers[17];
   switch (id) {
   case 1:
-    std::cout << Registers[10];
+    std::cout << Registers[10] << std::flush;
     break;
   case 4: {
     uint32_t startaddr = Registers[10];
     while (mem->read8(startaddr) != '\0') {
-      std::cout << mem->read8(startaddr);
+      std::cout << mem->read8(startaddr) << std::flush;
       ++startaddr;
     }
     break;
   }
   case 10:
-    std::cerr << "program exited through ecall\n";
+    std::cerr << "program exited successfully\n";
     stopped = true;
     break;
+  case 11: // Print Character (Add this!)
+    std::cout << static_cast<char>(Registers[10]) << std::flush;
+    break;
   case 93:
-    std::cerr << "program exited through ecall with exit code " +
+    std::cerr << "program exited successfully with exit code " +
                      std::to_string(Registers[10]) + "\n";
     stopped = true;
     break;
@@ -363,5 +371,50 @@ void CPU::BGEU() {
   if (Registers[decodereg(Instruction, 1)] >=
       Registers[decodereg(Instruction, 2)]) {
     programCounter += imm;
+  }
+}
+
+void CPU::LUI() {
+  uint32_t imm = Instruction & 0xFFFFF000;
+  if (decodereg(Instruction, 3)) {
+    Registers[decodereg(Instruction, 3)] = imm;
+  }
+}
+
+void CPU::AUIPC() {
+  uint32_t imm = Instruction & 0xFFFFF000;
+  if (decodereg(Instruction, 3)) {
+    Registers[decodereg(Instruction, 3)] = imm + programCounter;
+  }
+}
+
+void CPU::JAL() {
+  uint8_t i20 = (Instruction >> 31) & 1;
+  uint8_t i19_12 = (Instruction >> 12) & 0xFF;
+  uint8_t i11 = (Instruction >> 20) & 1;
+  uint8_t i10_1 = (Instruction >> 21) & 0x3FF;
+  int32_t imm = (i10_1 << 1) | (i11 << 11) | (i19_12 << 12) | i20 << 20;
+  imm = (imm << 11) >> 11;
+  if (decodereg(Instruction, 3)) {
+    Registers[decodereg(Instruction, 3)] = programCounter + 4;
+  }
+  programCounter += imm;
+}
+
+void CPU::cycle() {
+  Instruction = mem->read32(programCounter);
+  uint32_t previousPc = programCounter;
+  uint8_t opcode = Instruction & 0x7F;
+  uint8_t fun3 = (Instruction >> 12) & 0x7;
+  uint8_t fun7 = ((Instruction) >> 25) & 0x7F;
+  if (opcode != 0x33 && opcode != 0x13) {
+    fun7 = 0;
+  } else if (opcode == 0x13 && (fun3 != 0x1 && fun3 != 0x5)) {
+    fun7 = 0;
+  }
+  uint32_t index = opcode << 10 | fun3 << 7 | fun7;
+  (this->*opArray[index])();
+  if (previousPc == programCounter) {
+    programCounter += 4;
   }
 }

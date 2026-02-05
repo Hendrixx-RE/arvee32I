@@ -12,8 +12,7 @@ public:
   void write32(uint32_t addr, uint32_t value);
   void write16(uint32_t addr, uint16_t value);
   void write8(uint32_t addr, uint8_t value);
-
-  bool load_binary(const std::string &path);
+  void load_binary(const std::string &path);
 
 private:
   std::vector<uint8_t> ram;
