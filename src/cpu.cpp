@@ -5,7 +5,7 @@
 
 CPU::CPU(Memory *mem)
     : stopped(false), Registers(32), Instruction(0), programCounter(0),
-      mem(mem) {
+      mem(mem), changed(false) {
   Registers[2] = 64 * 1024 * 1024 - 1;
 }
 
@@ -203,6 +203,7 @@ void CPU::JALR() {
   }
   programCounter = val + Registers[decodereg(Instruction, 1)];
   programCounter &= 0xFFFFFFFE;
+  changed = true;
 }
 
 void CPU::LW() {
@@ -264,7 +265,8 @@ void CPU::FENCE() {}
 void CPU::SYSTEM() {
   uint32_t imm = (Instruction >> 20);
   if (imm) {
-    std::cerr << "EBREAK initiated" << std::endl;
+    std::cerr << "EBREAK initiated\n"
+              << std::hex << Registers[0x5] << std::endl;
     stopped = true;
     return;
   }
@@ -285,7 +287,7 @@ void CPU::SYSTEM() {
     std::cerr << "program exited successfully\n";
     stopped = true;
     break;
-  case 11: // Print Character (Add this!)
+  case 11:
     std::cout << static_cast<char>(Registers[10]) << std::flush;
     break;
   case 93:
@@ -331,6 +333,7 @@ void CPU::BEQ() {
   if (Registers[decodereg(Instruction, 1)] ==
       Registers[decodereg(Instruction, 2)]) {
     programCounter += imm;
+    changed = true;
   }
 }
 
@@ -339,6 +342,7 @@ void CPU::BNE() {
   if (Registers[decodereg(Instruction, 1)] !=
       Registers[decodereg(Instruction, 2)]) {
     programCounter += imm;
+    changed = true;
   }
 }
 
@@ -347,6 +351,7 @@ void CPU::BLT() {
   if (static_cast<int32_t>(Registers[decodereg(Instruction, 1)]) <
       static_cast<int32_t>(Registers[decodereg(Instruction, 2)])) {
     programCounter += imm;
+    changed = true;
   }
 }
 
@@ -355,6 +360,7 @@ void CPU::BGE() {
   if (static_cast<int32_t>(Registers[decodereg(Instruction, 1)]) >=
       static_cast<int32_t>(Registers[decodereg(Instruction, 2)])) {
     programCounter += imm;
+    changed = true;
   }
 }
 
@@ -363,6 +369,7 @@ void CPU::BLTU() {
   if (Registers[decodereg(Instruction, 1)] <
       Registers[decodereg(Instruction, 2)]) {
     programCounter += imm;
+    changed = true;
   }
 }
 
@@ -371,6 +378,7 @@ void CPU::BGEU() {
   if (Registers[decodereg(Instruction, 1)] >=
       Registers[decodereg(Instruction, 2)]) {
     programCounter += imm;
+    changed = true;
   }
 }
 
@@ -399,14 +407,17 @@ void CPU::JAL() {
     Registers[decodereg(Instruction, 3)] = programCounter + 4;
   }
   programCounter += imm;
+  changed = true;
 }
 
 void CPU::cycle() {
   Instruction = mem->read32(programCounter);
-  uint32_t previousPc = programCounter;
   uint8_t opcode = Instruction & 0x7F;
   uint8_t fun3 = (Instruction >> 12) & 0x7;
   uint8_t fun7 = ((Instruction) >> 25) & 0x7F;
+  if (opcode == 0x37 || opcode == 0x17 || opcode == 0x6F) {
+    fun3 = 0;
+  }
   if (opcode != 0x33 && opcode != 0x13) {
     fun7 = 0;
   } else if (opcode == 0x13 && (fun3 != 0x1 && fun3 != 0x5)) {
@@ -414,7 +425,9 @@ void CPU::cycle() {
   }
   uint32_t index = opcode << 10 | fun3 << 7 | fun7;
   (this->*opArray[index])();
-  if (previousPc == programCounter) {
+  if (!changed) {
     programCounter += 4;
+  } else {
+    changed = false;
   }
 }

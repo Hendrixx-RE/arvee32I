@@ -12,7 +12,8 @@ int main(int argc, char *argv[]) {
   CPU c{&m};
   try {
     m.load_binary(path);
-    while (!c.stopped) {
+    int temp = 1000;
+    while (!c.stopped && temp--) {
       c.cycle();
     }
   } catch (const std::runtime_error &e) {

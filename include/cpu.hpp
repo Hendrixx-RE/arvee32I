@@ -59,12 +59,13 @@ public:
   int32_t bhelper(uint32_t Instruction);
   int32_t shelper(uint32_t Instruction);
   void cycle();
+  std::vector<uint32_t> Registers;
 
 private:
-  std::vector<uint32_t> Registers;
   uint32_t Instruction;
   uint32_t programCounter;
   Memory *mem;
+  bool changed;
 };
 
 using funcp = void (CPU::*)();
@@ -101,7 +102,6 @@ inline constexpr std::array<funcp, 131072> makeOparray() {
   add_entry(0x13, 0x5, 0x20, &CPU::SRAI);
 
   // --- LOAD 0x03, STORE 0x23, BRANCH 0x63, JUMPS (f7 = 0) and the SYSTEM CALLS
-  // ---
   add_entry(0x03, 0x0, 0x00, &CPU::LB);
   add_entry(0x03, 0x1, 0x00, &CPU::LH);
   add_entry(0x03, 0x2, 0x00, &CPU::LW);
