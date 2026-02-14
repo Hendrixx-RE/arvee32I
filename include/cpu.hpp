@@ -54,14 +54,22 @@ public:
   void AUIPC();
   // Operations-J
   void JAL();
+  // csr
+  void CSRRW();
+  void CSRRS();
+  void CSRRC();
+  void CSRRWI();
+  void CSRRSI();
+  void CSRRCI();
   // helperfuncs
   uint8_t decodereg(uint32_t Instruction, int n);
   int32_t bhelper(uint32_t Instruction);
   int32_t shelper(uint32_t Instruction);
   void cycle();
-  std::vector<uint32_t> Registers;
 
 private:
+  std::vector<uint32_t> csrvec;
+  std::vector<uint32_t> Registers;
   uint32_t Instruction;
   uint32_t programCounter;
   Memory *mem;
@@ -78,7 +86,6 @@ inline constexpr std::array<funcp, 131072> makeOparray() {
     table[(op << 10) | (f3 << 7) | f7] = func;
   };
 
-  // --- OP 0x33 (R-Type) ---
   add_entry(0x33, 0x0, 0x00, &CPU::ADD);
   add_entry(0x33, 0x0, 0x20, &CPU::SUB);
   add_entry(0x33, 0x1, 0x00, &CPU::SLL);
@@ -89,8 +96,6 @@ inline constexpr std::array<funcp, 131072> makeOparray() {
   add_entry(0x33, 0x5, 0x20, &CPU::SRA);
   add_entry(0x33, 0x6, 0x00, &CPU::OR);
   add_entry(0x33, 0x7, 0x00, &CPU::AND);
-
-  // --- OP-IMM 0x13 (I-Type) ---
   add_entry(0x13, 0x0, 0x00, &CPU::ADDI);
   add_entry(0x13, 0x2, 0x00, &CPU::SLTI);
   add_entry(0x13, 0x3, 0x00, &CPU::SLTIU);
@@ -100,8 +105,6 @@ inline constexpr std::array<funcp, 131072> makeOparray() {
   add_entry(0x13, 0x1, 0x00, &CPU::SLLI);
   add_entry(0x13, 0x5, 0x00, &CPU::SRLI);
   add_entry(0x13, 0x5, 0x20, &CPU::SRAI);
-
-  // --- LOAD 0x03, STORE 0x23, BRANCH 0x63, JUMPS (f7 = 0) and the SYSTEM CALLS
   add_entry(0x03, 0x0, 0x00, &CPU::LB);
   add_entry(0x03, 0x1, 0x00, &CPU::LH);
   add_entry(0x03, 0x2, 0x00, &CPU::LW);
@@ -121,6 +124,12 @@ inline constexpr std::array<funcp, 131072> makeOparray() {
   add_entry(0x37, 0x0, 0x00, &CPU::LUI);
   add_entry(0x17, 0x0, 0x00, &CPU::AUIPC);
   add_entry(0x73, 0x0, 0x00, &CPU::SYSTEM);
+  add_entry(0x73, 0x1, 0x00, &CPU::CSRRW);
+  add_entry(0x73, 0x2, 0x00, &CPU::CSRRS);
+  add_entry(0x73, 0x3, 0x00, &CPU::CSRRC);
+  add_entry(0x73, 0x5, 0x00, &CPU::CSRRWI);
+  add_entry(0x73, 0x6, 0x00, &CPU::CSRRSI);
+  add_entry(0x73, 0x7, 0x00, &CPU::CSRRCI);
 
   return table;
 }

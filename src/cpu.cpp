@@ -4,9 +4,9 @@
 #include <stdexcept>
 
 CPU::CPU(Memory *mem)
-    : stopped(false), Registers(32), Instruction(0), programCounter(0),
-      mem(mem), changed(false) {
-  Registers[2] = 64 * 1024 * 1024 - 1;
+    : stopped(false), csrvec(4096), Registers(32), Instruction(0),
+      programCounter(mem->getstart()), mem(mem), changed(false) {
+  Registers[2] = programCounter + MEM_SIZE - 1;
 }
 
 uint8_t CPU::decodereg(uint32_t Instruction, int n) {
@@ -38,7 +38,6 @@ int32_t CPU::shelper(uint32_t Instruction) {
   return (val << 20) >> 20;
 }
 
-/* <--------------R-Type-Instructions--------------------->*/
 void CPU::ADD() {
   if (decodereg(Instruction, 3)) {
     Registers[decodereg(Instruction, 3)] =
@@ -120,8 +119,6 @@ void CPU::SRA() {
   }
 }
 
-/* <--------------I-Type-Instructions--------------------->*/
-
 void CPU::ADDI() {
   int32_t val = static_cast<int32_t>(Instruction) >> 20;
   if (decodereg(Instruction, 3)) {
@@ -184,7 +181,7 @@ void CPU::SRLI() {
   uint8_t val = ((Instruction) >> 20) & 0x1F;
   if (decodereg(Instruction, 3)) {
     Registers[decodereg(Instruction, 3)] =
-        static_cast<int32_t>(Registers[decodereg(Instruction, 1)]) >> val;
+        Registers[decodereg(Instruction, 1)] >> val;
   }
 }
 
@@ -197,17 +194,20 @@ void CPU::SRAI() {
 }
 
 void CPU::JALR() {
-  int32_t val = (static_cast<int32_t>(Instruction) >> 20);
+  int32_t val = (Instruction >> 20);
+  val = (val << 20) >> 20;
+  uint32_t base = Registers[decodereg(Instruction, 1)];
   if (decodereg(Instruction, 3)) {
     Registers[decodereg(Instruction, 3)] = programCounter + 4;
   }
-  programCounter = val + Registers[decodereg(Instruction, 1)];
+  programCounter = val + base;
   programCounter &= 0xFFFFFFFE;
   changed = true;
 }
 
 void CPU::LW() {
-  int32_t val = (static_cast<int32_t>(Instruction) >> 20);
+  int32_t val = (Instruction >> 20);
+  val = (val << 20) >> 20;
   uint32_t address = val + Registers[decodereg(Instruction, 1)];
   if (address % 4 != 0) {
     throw std::runtime_error("LW crashed coz of memory alingment at " +
@@ -219,7 +219,8 @@ void CPU::LW() {
 }
 
 void CPU::LH() {
-  int32_t val = (static_cast<int32_t>(Instruction) >> 20);
+  int32_t val = (Instruction >> 20);
+  val = (val << 20) >> 20;
   uint32_t address = val + Registers[decodereg(Instruction, 1)];
   if (address % 2 != 0) {
     throw std::runtime_error("LH crashed coz of memory alingment at " +
@@ -232,7 +233,8 @@ void CPU::LH() {
 }
 
 void CPU::LHU() {
-  int32_t val = (static_cast<int32_t>(Instruction) >> 20);
+  int32_t val = (Instruction >> 20);
+  val = (val << 20) >> 20;
   uint32_t address = val + Registers[decodereg(Instruction, 1)];
   if (address % 2 != 0) {
     throw std::runtime_error("LHU crashed coz of memory alingment at " +
@@ -244,7 +246,8 @@ void CPU::LHU() {
 }
 
 void CPU::LB() {
-  int32_t val = (static_cast<int32_t>(Instruction) >> 20);
+  int32_t val = (Instruction >> 20);
+  val = (val << 20) >> 20;
   uint32_t address = val + Registers[decodereg(Instruction, 1)];
   if (decodereg(Instruction, 3)) {
     int8_t temp = mem->read8(address);
@@ -253,7 +256,8 @@ void CPU::LB() {
 }
 
 void CPU::LBU() {
-  int32_t val = (static_cast<int32_t>(Instruction) >> 20);
+  int32_t val = (Instruction >> 20);
+  val = (val << 20) >> 20;
   uint32_t address = val + Registers[decodereg(Instruction, 1)];
   if (decodereg(Instruction, 3)) {
     Registers[decodereg(Instruction, 3)] = mem->read8(address);
@@ -264,41 +268,41 @@ void CPU::FENCE() {}
 
 void CPU::SYSTEM() {
   uint32_t imm = (Instruction >> 20);
-  if (imm) {
-    std::cerr << "EBREAK initiated\n"
-              << std::hex << Registers[0x5] << std::endl;
+  if (imm == 0x1) {
+    std::cerr << "EBREAK initiated at PC: " << std::hex << programCounter
+              << std::endl;
     stopped = true;
-    return;
-  }
-  uint32_t id = Registers[17];
-  switch (id) {
-  case 1:
-    std::cout << Registers[10] << std::flush;
-    break;
-  case 4: {
-    uint32_t startaddr = Registers[10];
-    while (mem->read8(startaddr) != '\0') {
-      std::cout << mem->read8(startaddr) << std::flush;
-      ++startaddr;
+  } else if (imm == 0x0) {
+    uint32_t id = Registers[17];
+    switch (id) {
+    case 1:
+      std::cout << Registers[10] << std::flush;
+      break;
+    case 4: {
+      uint32_t startaddr = Registers[10];
+      while (mem->read8(startaddr) != '\0') {
+        std::cout << mem->read8(startaddr) << std::flush;
+        ++startaddr;
+      }
+      break;
     }
-    break;
-  }
-  case 10:
-    std::cerr << "program exited successfully\n";
-    stopped = true;
-    break;
-  case 11:
-    std::cout << static_cast<char>(Registers[10]) << std::flush;
-    break;
-  case 93:
-    std::cerr << "program exited successfully with exit code " +
-                     std::to_string(Registers[10]) + "\n";
-    stopped = true;
-    break;
-  default:
-    std::cerr << "unknown system call stopping now!!\n";
-    stopped = true;
-    break;
+    case 10:
+      std::cerr << "program exited successfully\n";
+      stopped = true;
+      break;
+    case 11:
+      std::cout << static_cast<char>(Registers[10]) << std::flush;
+      break;
+    case 93:
+      std::cerr << "program exited successfully with exit code " +
+                       std::to_string(Registers[10]) + "\n";
+      stopped = true;
+      break;
+    default:
+      std::cerr << "unknown system call stopping now!!\n";
+      stopped = true;
+      break;
+    }
   }
 }
 
@@ -400,7 +404,7 @@ void CPU::JAL() {
   uint8_t i20 = (Instruction >> 31) & 1;
   uint8_t i19_12 = (Instruction >> 12) & 0xFF;
   uint8_t i11 = (Instruction >> 20) & 1;
-  uint8_t i10_1 = (Instruction >> 21) & 0x3FF;
+  uint16_t i10_1 = (Instruction >> 21) & 0x3FF;
   int32_t imm = (i10_1 << 1) | (i11 << 11) | (i19_12 << 12) | i20 << 20;
   imm = (imm << 11) >> 11;
   if (decodereg(Instruction, 3)) {
@@ -408,6 +412,72 @@ void CPU::JAL() {
   }
   programCounter += imm;
   changed = true;
+}
+
+void CPU::CSRRW() {
+  uint16_t loc = Instruction >> 20;
+  bool is_readonly = ((loc >> 10) == 0x3);
+  uint32_t temp = csrvec[loc];
+  if (!is_readonly)
+    csrvec[loc] = Registers[decodereg(Instruction, 1)];
+  if (decodereg(Instruction, 3)) {
+    Registers[decodereg(Instruction, 3)] = temp;
+  }
+}
+
+void CPU::CSRRS() {
+  uint16_t loc = Instruction >> 20;
+  bool is_readonly = ((loc >> 10) == 0x3);
+  uint32_t temp = csrvec[loc];
+  if (decodereg(!is_readonly && Instruction, 1))
+    csrvec[loc] = temp | Registers[decodereg(Instruction, 1)];
+  if (decodereg(Instruction, 3)) {
+    Registers[decodereg(Instruction, 3)] = temp;
+  }
+}
+
+void CPU::CSRRC() {
+  uint16_t loc = Instruction >> 20;
+  bool is_readonly = ((loc >> 10) == 0x3);
+  uint32_t temp = csrvec[loc];
+  if (decodereg(!is_readonly && Instruction, 1))
+    csrvec[loc] = temp & ~(Registers[decodereg(Instruction, 1)]);
+  if (decodereg(Instruction, 3)) {
+    Registers[decodereg(Instruction, 3)] = temp;
+  }
+}
+
+void CPU::CSRRWI() {
+  uint16_t loc = Instruction >> 20;
+  bool is_readonly = ((loc >> 10) == 0x3);
+  uint32_t temp = csrvec[loc];
+  if (!is_readonly)
+    csrvec[loc] = decodereg(Instruction, 1);
+  if (decodereg(Instruction, 3)) {
+    Registers[decodereg(Instruction, 3)] = temp;
+  }
+}
+
+void CPU::CSRRSI() {
+  uint16_t loc = Instruction >> 20;
+  bool is_readonly = ((loc >> 10) == 0x3);
+  uint32_t temp = csrvec[loc];
+  if (!is_readonly && decodereg(Instruction, 1))
+    csrvec[loc] = temp | decodereg(Instruction, 1);
+  if (decodereg(Instruction, 3)) {
+    Registers[decodereg(Instruction, 3)] = temp;
+  }
+}
+
+void CPU::CSRRCI() {
+  uint16_t loc = Instruction >> 20;
+  bool is_readonly = ((loc >> 10) == 0x3);
+  uint32_t temp = csrvec[loc];
+  if (!is_readonly && decodereg(Instruction, 1))
+    csrvec[loc] = temp & ~(decodereg(Instruction, 1));
+  if (decodereg(Instruction, 3)) {
+    Registers[decodereg(Instruction, 3)] = temp;
+  }
 }
 
 void CPU::cycle() {
@@ -421,6 +491,8 @@ void CPU::cycle() {
   if (opcode != 0x33 && opcode != 0x13) {
     fun7 = 0;
   } else if (opcode == 0x13 && (fun3 != 0x1 && fun3 != 0x5)) {
+    fun7 = 0;
+  } else if (opcode == 0x73 && fun3 != 0) {
     fun7 = 0;
   }
   uint32_t index = opcode << 10 | fun3 << 7 | fun7;

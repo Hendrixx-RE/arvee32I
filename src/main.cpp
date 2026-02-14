@@ -9,11 +9,10 @@ int main(int argc, char *argv[]) {
   }
   std::string path = argv[1];
   Memory m;
-  CPU c{&m};
   try {
-    m.load_binary(path);
-    int temp = 1000;
-    while (!c.stopped && temp--) {
+    m.load_elf(path);
+    CPU c{&m};
+    while (!c.stopped) {
       c.cycle();
     }
   } catch (const std::runtime_error &e) {
