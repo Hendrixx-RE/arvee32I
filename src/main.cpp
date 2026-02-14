@@ -3,14 +3,19 @@
 #include <iostream>
 
 int main(int argc, char *argv[]) {
-  if (argc < 2) {
-    std::cerr << "No file specified\n";
+  if (argc < 3) {
+    std::cerr << "Missing parameters\n";
     std::exit(EXIT_FAILURE);
   }
-  std::string path = argv[1];
+  std::string path = argv[2];
+  std::string filetype = argv[1];
   Memory m;
   try {
-    m.load_elf(path);
+    if (filetype == "-e") {
+      m.load_elf(path);
+    } else {
+      m.load_binary(path);
+    }
     CPU c{&m};
     while (!c.stopped) {
       c.cycle();

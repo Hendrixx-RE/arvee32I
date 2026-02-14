@@ -278,7 +278,7 @@ void CPU::SYSTEM() {
     case 1:
       std::cout << Registers[10] << std::flush;
       break;
-    case 4: {
+    case 64: {
       uint32_t startaddr = Registers[10];
       while (mem->read8(startaddr) != '\0') {
         std::cout << mem->read8(startaddr) << std::flush;
