@@ -1,25 +1,42 @@
-RV32I Emulator
+# RISC-V 32I Emulator
 
-A lightweight, functional emulator for the RISC-V RV32I (Base Integer Instruction Set).
+A high-performance RV32I (Base Integer Instruction Set) emulator written in C++ (for educational purposes). This project is designed to simulate a 32-bit RISC-V CPU, providing a sandboxed environment for running bare-metal RISC-V binaries and passing official architectural tests.
 
-The emulator processes instructions through a standard pipeline.
+## Overview
+The emulator implements the fetch-decode-execute cycle for 32-bit instructions. It features a byte-addressable memory system within a 32-bit address space, supporting Little-Endian data storage.
+
+### Core Specifications:
+- **ISA**: RV32I (Base Integer)
+- **Registers**: 32 general-purpose integer registers (`x0` hardwired to 0)
+- **Memory**: 32-bit addressable, byte-level access
+- **ABI**: Supports both custom TUI-style syscalls and standard Linux-style `ecall` interfaces.
+- **Load**: Supports both binary and elf loading
+
+## Architecture
+The emulator is structured into three primary components:
+1. **CPU**: Handles the register file, program counter (PC), and the instruction pipeline.
+2. **Memory**: A virtualized 4GB address space (sparse or flat implementation) with 8-bit granularity.
+3. **Bus/System**: Manages the communication between the CPU and peripherals (like the System call handler).
 
 
-Load a binary file into the emulator:
+##  Compliance & Testing
+This emulator is designed to pass the **RISC-V Architectural Tests**. 
 
-```./rv32i_emu path/to/your/program.bin```
+- [x] **RV32I Base**: Passes all standard computational tests (ADD, SUB, SLT, etc.).
+- [x] **Control Flow**: Passes branch and jump (JAL, JALR) compliance.
+- [X] **CSRs**: (Planned) Control and Status Register support.
+- [ ] **M-Extension**: (Planned) Integer Multiplications and Division.
 
-Supported Instructions
-Type	Instructions
-R-Type	add, sub, sll, slt, sltu, xor, srl, sra, or, and
-I-Type	addi, slti, sltiu, xori, ori, andi, lb, lh, lw, lbu, lhu
-S-Type	sb, sh, sw
-B-Type	beq, bne, blt, bge, bltu, bgeu
-U-Type	lui, auipc
-J-Type	jal, jalr
 
-📜 License
+##  Building the Project
 
-This project is licensed under the MIT License.
+### Prerequisites
+- C++17 or higher
+- `riscv32-unknown-elf-` toolchain
 
-Would you like me to help you write a "Technical Challenges" section detailing how you handled things like sign-extension or branch offsets?
+### Compilation
+```bash
+cmake -B build
+cmake --build build
+cd build
+./rv32i {loadtype} {filepath}
