@@ -25,7 +25,6 @@ This emulator is designed to pass the **RISC-V Architectural Tests**.
 - [x] **RV32I Base**: Passes all standard computational tests (ADD, SUB, SLT, etc.).
 - [x] **Control Flow**: Passes branch and jump (JAL, JALR) compliance.
 - [X] **CSRs**: (Planned) Control and Status Register support.
-- [ ] **M-Extension**: (Planned) Integer Multiplications and Division.
 
 
 ##  Building the Project
